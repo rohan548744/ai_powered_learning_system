@@ -19,17 +19,8 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static files from Vite build in production
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, '..', 'dist');
-  app.use(express.static(distPath));
-  // For SPA client-side routing, serve index.html for unknown routes
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -157,6 +148,19 @@ app.post('/api/roadmap', async (req, res) => {
 // Catch-all 404
 // Use app.use without a path so Express doesn't try to compile a '*' route
 // into path-to-regexp (older path-to-regexp versions may throw on '*').
+// Serve static files from Vite build in production (placed after API routes)
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+  // For SPA client-side routing, serve index.html for unknown non-API routes
+  app.get(/.*/, (req, res, next) => {
+    // If the request is for an API route, skip to the API handlers
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
+// Catch-all 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
